@@ -13,6 +13,9 @@ export async function GET() {
     googleDriveEnabled: cfg.googleDriveEnabled,
     syncIntervalMinutes: cfg.syncIntervalMinutes,
     cloudOnly: cfg.cloudOnly,
+    // Config status flags
+    hasOpenaiKey: Boolean(process.env.OPENAI_API_KEY),
+    hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
   };
   return NextResponse.json(safe);
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Brain, MessageSquare, Settings, BarChart3 } from 'lucide-react';
+import { Brain, MessageSquare, Settings, BarChart3, Rocket } from 'lucide-react';
 
 export default function NavBar() {
   const pathname = usePathname();
@@ -12,6 +12,7 @@ export default function NavBar() {
     { href: '/brain', label: 'Brain', icon: Brain },
     { href: '/stats', label: 'Stats', icon: BarChart3 },
     { href: '/settings', label: 'Settings', icon: Settings },
+    { href: '/onboarding', label: 'Setup', icon: Rocket },
   ];
 
   return (
