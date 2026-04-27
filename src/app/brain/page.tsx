@@ -1,5 +1,13 @@
-import Brain3DVisualization from '@/components/brain/Brain3DVisualization';
-import { Suspense } from 'react';
+import dynamic from 'next/dynamic';
+
+const Brain3DVisualization = dynamic(() => import('@/components/brain/Brain3DVisualization'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[700px]">
+      <div className="inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  ),
+});
 
 export const metadata = {
   title: 'Your Brain — Shivver',
@@ -23,13 +31,7 @@ export default function BrainPage() {
       </div>
 
       {/* 3D Graph */}
-      <Suspense fallback={
-        <div className="flex items-center justify-center h-[700px]">
-          <div className="inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      }>
-        <Brain3DVisualization />
-      </Suspense>
+      <Brain3DVisualization />
 
       {/* Behavior Insights */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
