@@ -1,26 +1,26 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "/api/$1"
     }
   ],
-  "env": {
-    "NODE_ENV": "production"
-  },
   "functions": {
     "app/api/chat/route.ts": {
       "maxDuration": 60
     },
     "app/api/messages/route.ts": {
       "maxDuration": 10
+    },
+    "app/api/vision/analyze/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/stt/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/tts/route.ts": {
+      "maxDuration": 30
     }
   },
   "crons": [
