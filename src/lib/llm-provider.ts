@@ -35,6 +35,11 @@ interface ProviderConfig {
   baseURL?: string; // static override if needed
 }
 
+interface GlobalApiKeyEntry {
+  provider: ProviderId;
+  key: string;
+}
+
 const PROVIDERS: ProviderConfig[] = [
   {
     id: 'openai',
@@ -98,6 +103,42 @@ function getProviderConfig(providerId: ProviderId): ProviderConfig {
   return PROVIDERS.find(p => p.id === providerId)!;
 }
 
+function detectProviderFromApiKey(key: string): ProviderId | null {
+  const trimmed = key.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith('gsk_')) return 'groq';
+  if (trimmed.startsWith('sk-ant-')) return 'anthropic';
+  if (trimmed.startsWith('AIza')) return 'gemini';
+  if (trimmed.startsWith('sk-')) return 'openai';
+
+  return null;
+}
+
+function getGlobalApiKeyEntries(): GlobalApiKeyEntry[] {
+  const rawKeys = [
+    process.env.GLOBAL_LLM_API_KEY,
+    process.env.GLOBAL_LLM_API_KEYS,
+    process.env.LLM_API_KEY,
+    process.env.LLM_API_KEYS,
+  ]
+    .filter(Boolean)
+    .join(',');
+
+  if (!rawKeys) return [];
+
+  return rawKeys
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean)
+    .map((key): GlobalApiKeyEntry | null => {
+      const provider = detectProviderFromApiKey(key);
+      if (!provider) return null;
+      return { provider, key };
+    })
+    .filter((entry): entry is GlobalApiKeyEntry => Boolean(entry));
+}
+
 function getAllProvidersInOrder(): ProviderId[] {
   const orderEnv = process.env.LLM_PROVIDER_ORDER;
   const ordered: ProviderId[] = orderEnv
@@ -133,7 +174,8 @@ export async function callLLM(
     if (p !== primaryProvider && !tryOrder.includes(p)) tryOrder.push(p);
   }
 
-  const lastError: Error | null = null;
+  let lastError: Error | null = null;
+  const globalEntries = getGlobalApiKeyEntries();
 
   for (const providerId of tryOrder) {
     const cfg = getProviderConfig(providerId);
@@ -144,6 +186,10 @@ export async function callLLM(
     if (primaryKey) keys.push(primaryKey);
     const extraKeys = getEnvArray(cfg.keysEnv);
     keys.push(...extraKeys);
+    const globalProviderKeys = globalEntries
+      .filter(entry => entry.provider === providerId)
+      .map(entry => entry.key);
+    keys.push(...globalProviderKeys);
 
     // If no key and provider requires one, skip (except ollama)
     if (keys.length === 0 && providerId !== 'ollama') {
