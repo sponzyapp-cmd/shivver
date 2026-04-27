@@ -1,17 +1,28 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { HardDrive, Cloud, RefreshCw, Upload, Download, Link2, Unlink, Check, X, Key, Save } from 'lucide-react';
+import { HardDrive, Cloud, RefreshCw, Upload, Download, Link2, Unlink, Check, X, Key, Save, Cpu, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import { Spinner } from '@/components/ui/Spinner';
+import { Badge } from '@/components/ui/Badge';
 import type { ShivverConfig } from '@/lib/platform';
 
 interface EnvVar {
   key: string;
   value: string;
   isSecret: boolean;
+  provider?: string; // e.g., 'openai', 'groq'
 }
+
+const LLM_PROVIDERS = [
+  { id: 'openai', name: 'OpenAI', icon: '🤖', models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'], keyEnv: 'OPENAI_API_KEY', modelEnv: 'OPENAI_MODEL', keysEnv: 'OPENAI_KEYS' },
+  { id: 'groq', name: 'Groq', icon: '⚡', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'], keyEnv: 'GROQ_API_KEY', modelEnv: 'GROQ_MODEL', keysEnv: 'GROQ_KEYS' },
+  { id: 'anthropic', name: 'Anthropic', icon: '🧠', models: ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229'], keyEnv: 'ANTHROPIC_API_KEY', modelEnv: 'ANTHROPIC_MODEL', keysEnv: null },
+  { id: 'gemini', name: 'Google Gemini', icon: '💎', models: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'], keyEnv: 'GEMINI_API_KEY', modelEnv: 'GEMINI_MODEL', keysEnv: null },
+  { id: 'ollama', name: 'Ollama (Local)', icon: '🏠', models: ['llama3:70b', 'codellama:70b', 'mistral'], keyEnv: null, modelEnv: 'OLLAMA_MODEL', keysEnv: null, baseUrlEnv: 'OLLAMA_BASE_URL' },
+] as const;
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<ShivverConfig | null>(null);
@@ -19,8 +30,7 @@ export default function SettingsPage() {
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [envVars, setEnvVars] = useState<EnvVar[]>([]);
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [providerKeys, setProviderKeys] = useState<Record<string, { key: string; keys: string; model: string }>>({});
 
   useEffect(() => {
     Promise.all([fetchConfig(), fetchEnv()]);
@@ -48,9 +58,70 @@ export default function SettingsPage() {
         isSecret: /key|secret|token|password|auth/i.test(k),
       }));
       setEnvVars(vars);
+
+      // Build provider keys map
+      const p: Record<string, { key: string; keys: string; model: string }> = {};
+      for (const prov of LLM_PROVIDERS) {
+        p[prov.id] = {
+          key: data.env[prov.keyEnv] || '',
+          keys: data.env[prov.keysEnv] || '',
+          model: data.env[prov.modelEnv] || '',
+        };
+      }
+      // Also get provider order
+      p['_order'] = { key: data.env['LLM_PROVIDER_ORDER'] || '', keys: '', model: '' };
+      p['_default'] = { key: data.env['DEFAULT_LLM_PROVIDER'] || '', keys: '', model: '' };
+      setProviderKeys(p);
     } catch (err) {
       console.error('Failed to load env:', err);
     }
+  }
+
+  async function saveProviderConfig(providerId: string, field: 'key' | 'keys' | 'model', value: string) {
+    setProviderKeys(prev => ({
+      ...prev,
+      [providerId]: { ...prev[providerId], [field]: value },
+    }));
+  }
+
+  async function saveAll() {
+    setSyncing(true);
+    try {
+      const body: Record<string, string> = {};
+
+      // Provider config
+      for (const prov of LLM_PROVIDERS) {
+        const p = providerKeys[prov.id];
+        if (p) {
+          if (p.key) body[prov.keyEnv] = p.key;
+          if (p.keys) body[prov.keysEnv] = p.keys;
+          if (p.model) body[prov.modelEnv] = p.model;
+        }
+      }
+      // Order + default
+      if (providerKeys['_order']?.key) body['LLM_PROVIDER_ORDER'] = providerKeys['_order'].key;
+      if (providerKeys['_default']?.key) body['DEFAULT_LLM_PROVIDER'] = providerKeys['_default'].key;
+
+      const res = await fetch('/api/settings/env', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) throw new Error('Failed to save');
+
+      showMessage('AI provider configuration saved', 'success');
+      setTimeout(() => window.location.reload(), 800);
+    } catch (err) {
+      showMessage('Failed to save', 'error');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  function getEnvValue(key: string): string {
+    const found = envVars.find(v => v.key === key);
+    return found?.value || '';
   }
 
   async function handleModeChange(mode: 'local' | 'cloud') {
@@ -70,31 +141,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleEnvSave(key: string, value: string) {
-    try {
-      await fetch('/api/settings/env', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value }),
-      });
-      setEnvVars(prev => prev.map(v => v.key === key ? { ...v, value: '••••••••' } : v));
-      setEditingKey(null);
-      showMessage('Environment updated', 'success');
-    } catch (err) {
-      showMessage('Failed to update env', 'error');
-    }
-  }
-
-  async function handleEnvReset() {
-    try {
-      await fetch('/api/settings/env', { method: 'POST' });
-      await fetchEnv();
-      showMessage('Environment reset to defaults', 'success');
-    } catch (err) {
-      showMessage('Reset failed', 'error');
-    }
-  }
-
   function showMessage(text: string, type: 'success' | 'error') {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 3000);
@@ -103,7 +149,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -158,78 +204,121 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Environment Variables — Local mode only */}
-      {config.mode === 'local' ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5" />
-              Environment Variables
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-slate-400 text-sm">
-              API keys and configuration. Secrets are masked. Changes take effect immediately.
-            </p>
+      {/* AI Providers */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Cpu className="h-5 w-5" />
+            AI Providers (Bring Your Own Key)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <p className="text-slate-400 text-sm">
+            Choose which LLM provider powers Shivver. Add multiple keys for failover when rate limits hit.
+          </p>
 
-            <div className="space-y-3">
-              {envVars.map(v => (
-                <div key={v.key} className="flex items-center gap-3 p-3 bg-surface rounded-lg">
-                  <div className="flex-1">
-                    <div className="text-sm font-mono text-slate-300">{v.key}</div>
-                    {editingKey === v.key ? (
-                      <Input
-                        type={v.isSecret ? 'password' : 'text'}
-                        value={editValue}
-                        onChange={e => setEditValue(e.target.value)}
-                        className="mt-1"
-                        placeholder="Enter value"
-                      />
-                    ) : (
-                      <div className="text-xs text-slate-400 mt-1 font-mono">
-                        {v.isSecret ? '•'.repeat(12) : v.value}
-                      </div>
-                    )}
+          {/* Default provider + order */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Default Provider</label>
+              <select
+                value={providerKeys['_default']?.key || 'openai'}
+                onChange={e => saveProviderConfig('_default', 'key', e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm"
+              >
+                {LLM_PROVIDERS.map(p => (
+                  <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Failover Order (comma-separated IDs)</label>
+              <Input
+                value={providerKeys['_order']?.key || 'openai,groq,anthropic,gemini,ollama'}
+                onChange={e => saveProviderConfig('_order', 'key', e.target.value)}
+                placeholder="openai,groq,anthropic"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Shivver tries providers in order when one is rate-limited.</p>
+            </div>
+          </div>
+
+          {/* Per-provider config */}
+          <div className="space-y-4">
+            {LLM_PROVIDERS.map(prov => {
+              const p = providerKeys[prov.id] || { key: '', keys: '', model: '' };
+              return (
+                <div key={prov.id} className="border border-border/50 rounded-lg p-4 bg-surface/30">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">{prov.icon}</span>
+                    <h3 className="font-semibold">{prov.name}</h3>
+                    {p.key && <Badge variant="success" size="sm">Configured</Badge>}
                   </div>
-                  {editingKey === v.key ? (
-                    <>
-                      <Button size="sm" onClick={() => handleEnvSave(v.key, editValue)}>
-                        <Save className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setEditingKey(null)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <Button size="sm" variant="ghost" onClick={() => { setEditingKey(v.key); setEditValue(''); }}>
-                      Edit
-                    </Button>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">API Key</label>
+                      <Input
+                        type="password"
+                        value={p.key}
+                        onChange={e => saveProviderConfig(prov.id, 'key', e.target.value)}
+                        placeholder={`Enter ${prov.name} API key`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Model</label>
+                      <select
+                        value={p.model}
+                        onChange={e => saveProviderConfig(prov.id, 'model', e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm"
+                      >
+                        <option value="">Auto (recommended)</option>
+                        {prov.models.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {prov.keysEnv && (
+                    <div className="mt-3">
+                      <label className="text-sm font-medium mb-1 block">
+                        Additional Keys (comma-separated, for rotation)
+                      </label>
+                      <Input
+                        type="password"
+                        value={p.keys}
+                        onChange={e => saveProviderConfig(prov.id, 'keys', e.target.value)}
+                        placeholder={`Additional ${prov.name} keys (optional)`}
+                      />
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Add extra keys to auto-rotate when daily limits are reached.
+                      </p>
+                    </div>
+                  )}
+
+                  {prov.baseUrlEnv && (
+                    <div className="mt-3">
+                      <label className="text-sm font-medium mb-1 block">Base URL</label>
+                      <Input
+                        value={p.key /* reuse field for base URL */}
+                        onChange={e => saveProviderConfig(prov.id, 'key', e.target.value)}
+                        placeholder="http://localhost:11434"
+                      />
+                    </div>
                   )}
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
-            <Button variant="secondary" onClick={handleEnvReset}>
-              Reset to defaults
+          <div className="pt-4 border-t border-border">
+            <Button onClick={saveAll} disabled={syncing} className="w-full">
+              {syncing ? <Spinner size="sm" className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Save AI Provider Configuration
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5" />
-              Environment
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-400 text-sm">
-              Cloud mode uses platform-provided environment (Supabase dashboard, Vercel dashboard).
-              Edit your .env file locally for local mode.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Google Drive */}
       <Card>
@@ -243,7 +332,7 @@ export default function SettingsPage() {
           <p className="text-slate-400 text-sm mb-4">
             Backup your brain graph and settings to Google Drive.
           </p>
-          <Button onClick={() => {}}>
+          <Button onClick={() => { }}>
             <Link2 className="h-4 w-4 mr-2" />
             Connect Google Drive
           </Button>
@@ -257,7 +346,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <Button as="a" href="/stats" variant="secondary">
-            <BarChart3 className="h-4 w-4 mr-2" />
+            <Zap className="h-4 w-4 mr-2" />
             View Usage Statistics
           </Button>
         </CardContent>

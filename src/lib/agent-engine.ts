@@ -1,4 +1,3 @@
-import { openai } from '@/lib/openai';
 import { db } from '@/lib/db';
 import { agents, agent_executions, tools, tool_executions, messages, sessions } from '@/lib/db/schema';
 import { eq, sql, desc } from 'drizzle-orm';
@@ -6,6 +5,7 @@ import { nanoid } from 'nanoid';
 import { supabase } from '@/lib/supabase';
 import { executeComputerTool } from '@/lib/computer-tool-executor';
 import { planTask } from '@/lib/vision';
+import { callLLM, type LLMMessage } from '@/lib/llm-provider';
 
 export type ToolCall = {
   name: string;
@@ -325,39 +325,43 @@ export async function runAgent(
       // Full implementation would use tool_choice and parse function calls
     }
 
-    // Call OpenAI
-    const response = await openai.chat.completions.create({
-      model: agent.model,
-      messages: apiMessages,
-      temperature: 0.7,
-      max_tokens: 2048,
-      // tools: tools.map(t => ({
-      //   type: 'function',
-      //   function: { name: t.name, description: t.description, parameters: t.parameters }
-      // })) as any,
-    });
+    // Build LLM messages
+    const llmMessages: LLMMessage[] = [
+      { role: 'system', content: agent.systemPrompt || 'You are a helpful assistant.' },
+      ...inputMessages.map(m => ({ role: m.role as LLMMessage['role'], content: m.content }) as LLMMessage),
+    ];
 
-    const assistantMessage = response.choices[0].message;
-    const content = assistantMessage.content || '';
+    // Map agent.provider to unified provider ID
+    const providerMap: Record<string, any> = {
+      openai: 'openai',
+      claude: 'anthropic',
+      gemini: 'gemini',
+      custom: 'groq', // default custom provider
+    };
+    const preferredProvider = providerMap[agent.provider] || 'openai';
 
-    // Check for tool calls (simplified)
-    // In full version, would process tool_calls array
+    // Call LLM with smart failover
+    const llmResponse = await callLLM(llmMessages, preferredProvider as any, agent.model);
+
+    const content = llmResponse.content;
+    const tokensUsed = llmResponse.tokensUsed?.total || 0;
+    const costTotal = llmResponse.cost || 0;
 
     // Update execution record
     await db.update(agent_executions)
       .set({
         output: { content },
-        tokensUsed: response.usage?.total_tokens || 0,
+        tokensUsed,
         cost: {
-          input: (response.usage?.prompt_tokens || 0) * 0.00000015, // gpt-4o-mini pricing
-          output: (response.usage?.completion_tokens || 0) * 0.0000006,
-          total: ((response.usage?.prompt_tokens || 0) * 0.00000015) + ((response.usage?.completion_tokens || 0) * 0.0000006),
+          input: 0,
+          output: 0,
+          total: costTotal,
         },
         completedAt: new Date(),
       })
       .where(eq(agent_executions.id, execution.id));
 
-    return { content, tokensUsed: response.usage?.total_tokens };
+    return { content, tokensUsed };
   } catch (error: any) {
     await db.update(agent_executions)
       .set({ error: error.message, completedAt: new Date() })

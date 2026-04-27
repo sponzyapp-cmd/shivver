@@ -24,22 +24,32 @@ export async function GET() {
   return NextResponse.json({ env: masked });
 }
 
-// PATCH /api/settings/env — update specific env var
+// PATCH /api/settings/env — update one or many env vars
+// Accepts: { key, value } OR { KEY1: val1, KEY2: val2, ... }
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  const { key, value } = body;
 
-  if (!key || typeof key !== 'string') {
-    return NextResponse.json({ error: 'Key required' }, { status: 400 });
+  let updates: Record<string, string>;
+  if (body.key && body.value !== undefined) {
+    // Single key update (legacy)
+    updates = { [body.key]: body.value };
+  } else {
+    // Bulk update
+    updates = body;
   }
 
   const env = parse(fs.readFileSync(ENV_PATH, 'utf-8'));
-  env[key] = value || '';
-  const content = stringify(env, { excludes: (val) => val === undefined });
 
+  for (const [key, value] of Object.entries(updates)) {
+    if (typeof key === 'string' && key.trim()) {
+      env[key] = (value as string) ?? '';
+    }
+  }
+
+  const content = stringify(env, { excludes: (val) => val === undefined });
   fs.writeFileSync(ENV_PATH, content);
 
-  return NextResponse.json({ success: true, key, value: '••••••••'.includes(value) ? '***' : value });
+  return NextResponse.json({ success: true, updatedCount: Object.keys(updates).length });
 }
 
 // POST /api/settings/env/reset — reset to defaults (from .env.example)
