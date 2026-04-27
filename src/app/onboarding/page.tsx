@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Check, ChevronRight, HardDrive, Cloud, Key, Database, Play, Rocket } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, ArrowRight, HardDrive, Cloud, Key, Database, Play, Rocket, Check } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
-import { useRouter } from 'next/navigation';
+import { LogoWatermarkPattern } from '@/components/onboarding/LogoWatermarkPattern';
 
 type Step = 'welcome' | 'mode' | 'api-keys' | 'database' | 'migrate' | 'done';
 
@@ -19,6 +21,9 @@ interface ConfigState {
   supabaseKey: string;
   databaseUrl: string;
 }
+
+// Steps for progress bar
+const STEPS: Step[] = ['welcome', 'mode', 'api-keys', 'database', 'migrate', 'done'];
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -33,20 +38,9 @@ export default function OnboardingPage() {
   });
   const [running, setRunning] = useState(false);
   const [log, setLog] = useState<string[]>([]);
-  const [detected, setDetected] = useState<{
-    isVercel: boolean;
-    hasSupabaseUrl: boolean;
-    supabaseUrl: string;
-    hasSupabaseKey: boolean;
-    hasDatabaseUrl: boolean;
-    databaseUrl: string;
-    hasOpenaiKey: boolean;
-  }>({
+  const [detected, setDetected] = useState<{ isVercel: boolean; supabaseUrl: string; databaseUrl: string; hasOpenaiKey: boolean }>({
     isVercel: false,
-    hasSupabaseUrl: false,
     supabaseUrl: '',
-    hasSupabaseKey: false,
-    hasDatabaseUrl: false,
     databaseUrl: '',
     hasOpenaiKey: false,
   });
@@ -70,7 +64,7 @@ export default function OnboardingPage() {
     checkConfig();
   }, [router]);
 
-  // Auto-detect environment (Vercel, Supabase presence)
+  // Auto-detect environment
   useEffect(() => {
     async function detect() {
       try {
@@ -78,19 +72,8 @@ export default function OnboardingPage() {
         if (res.ok) {
           const data = await res.json();
           setDetected(data);
-          // Auto-suggest cloud mode if on Vercel with Supabase
-          if (data.isVercel && data.hasSupabaseUrl) {
-            setConfig(prev => ({
-              ...prev,
-              mode: 'cloud',
-              supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || prev.supabaseUrl,
-              databaseUrl: process.env.DATABASE_URL || prev.databaseUrl,
-            }));
-          }
         }
-      } catch (err) {
-        console.error('Env detection failed:', err);
-      }
+      } catch {}
     }
     detect();
   }, []);
@@ -99,60 +82,26 @@ export default function OnboardingPage() {
     setConfig(prev => ({ ...prev, [field]: value }));
   }
 
-  async function handleAutoDetect() {
-    // If on Vercel with Supabase, suggest cloud mode
-    if (detected.isVercel && detected.hasSupabaseUrl) {
+  // If already has OpenAI key, start at mode; else auto-detect cloud
+  useEffect(() => {
+    if (checking) return;
+    if (detected.hasOpenaiKey) {
+      setStep('mode');
+    } else if (detected.isVercel && detected.supabaseUrl) {
       setConfig(prev => ({
         ...prev,
         mode: 'cloud',
-        supabaseUrl: detected.supabaseUrl || prev.supabaseUrl,
-        databaseUrl: detected.databaseUrl || prev.databaseUrl,
+        supabaseUrl: detected.supabaseUrl,
+        databaseUrl: detected.databaseUrl,
       }));
-      setStep('api-keys'); // skip mode selection
+      setStep('api-keys');
     } else {
-      // Local or simple — prefill database URL if available
-      if (detected.databaseUrl) {
-        setConfig(prev => ({ ...prev, databaseUrl: detected.databaseUrl }));
-      }
-      setStep('mode');
+      setStep('welcome');
     }
-  }
-
-  useEffect(() => {
-    // Auto-start detection (if URLs are preset, skip to appropriate step)
-    if (detected.hasOpenaiKey) {
-      // Already has key, can auto-skip to mode selection or migrations
-      setStep('mode');
-    } else {
-      handleAutoDetect();
-    }
-  }, [detected]);
-
-  async function runMigrations() {
-    setRunning(true);
-    setLog(prev => [...prev, '→ Starting database migrations...']);
-
-    try {
-      const res = await fetch('/api/admin/migrate', { method: 'POST' });
-      const data = await res.json();
-
-      if (data.success) {
-        setLog(prev => [...prev, `✓ ${data.message}`, '✓ Database ready!']);
-        setStep('done');
-      } else {
-        setLog(prev => [...prev, `✗ ${data.error}`]);
-      }
-    } catch (err: any) {
-      setLog(prev => [...prev, `✗ Migration failed: ${err.message}`]);
-    } finally {
-      setRunning(false);
-    }
-  }
+  }, [checking, detected]);
 
   async function saveEnvAndContinue() {
     setRunning(true);
-    setLog(prev => [...prev, '→ Saving configuration...']);
-
     try {
       const body: Record<string, string> = {};
       if (config.openaiKey) body.OPENAI_API_KEY = config.openaiKey;
@@ -166,17 +115,46 @@ export default function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      if (!res.ok) throw new Error('Failed to save');
 
-      if (!res.ok) throw new Error('Failed to save env');
-
-      setLog(prev => [...prev, '✓ Environment saved']);
-      setStep('migrate');
+      // Route based on mode: local needs DB URL confirmation; cloud goes straight to migrate
+      if (config.mode === 'local') {
+        setStep('database');
+      } else {
+        setStep('migrate');
+      }
     } catch (err: any) {
       setLog(prev => [...prev, `✗ ${err.message}`]);
     } finally {
       setRunning(false);
     }
   }
+
+  async function runMigrations() {
+    setRunning(true);
+    setLog(prev => [...prev, '→ Starting database migrations...']);
+    try {
+      const res = await fetch('/api/admin/migrate', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setLog(prev => [...prev, `✓ ${data.message}`, '✓ Database ready!']);
+        setStep('done');
+      } else {
+        setLog(prev => [...prev, `✗ ${data.error}`]);
+      }
+    } catch (err: any) {
+      setLog(prev => [...prev, `✗ Migration failed`]);
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  // Progress percent
+  const progress = useMemo(() => {
+    const idx = STEPS.indexOf(step);
+    const normalizedIdx = step === 'done' ? idx + 1 : idx;
+    return Math.min(100, Math.round((normalizedIdx / (STEPS.length - 1)) * 100));
+  }, [step]);
 
   if (checking) {
     return (
@@ -190,64 +168,85 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-base p-4">
-      <div className="w-full max-w-2xl space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-accent to-indigo-600 text-white text-2xl font-bold shadow-lg mb-4">
-            S
-          </div>
-          <h1 className="text-3xl font-bold">Welcome to Shivver</h1>
-          <p className="text-slate-400">Your personal AI assistant — let&apos;s get you set up in &lt;2 minutes.</p>
-        </div>
+    <div className="relative min-h-screen overflow-hidden bg-base">
+      <LogoWatermarkPattern />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {step === 'welcome' && <Rocket className="h-5 w-5" />}
-              {step === 'mode' && <HardDrive className="h-5 w-5" />}
-              {step === 'api-keys' && <Key className="h-5 w-5" />}
-              {step === 'database' && <Database className="h-5 w-5" />}
-              {step === 'migrate' && <Play className="h-5 w-5" />}
-              {step === 'done' && <Check className="h-5 w-5 text-success" />}
-              <span>{step === 'welcome' ? 'Get Started' : step === 'mode' ? 'Choose Mode' : step === 'api-keys' ? 'API Keys' : step === 'database' ? 'Database' : step === 'migrate' ? 'Initialize' : 'All Set!'}</span>
-              {config.mode && <Badge variant="accent" size="sm">{config.mode}</Badge>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Step: Welcome */}
+      <div className="relative z-10 mx-auto flex h-screen w-full max-w-2xl flex-col px-4 pb-5">
+        {/* Header with back & progress */}
+        <header className="mb-2 flex items-center gap-3">
+          {step !== 'welcome' && step !== 'done' && (
+            <button
+              type="button"
+              onClick={() => {
+                const prevIdx = Math.max(0, STEPS.indexOf(step) - 1);
+                setStep(STEPS[prevIdx]);
+              }}
+              className="grid h-9 w-9 place-items-center rounded-full bg-surface text-text shadow-sm"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          )}
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-secondary">
+            <motion.div
+              className="h-full rounded-full bg-accent"
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.4 }}
+            />
+          </div>
+          <span className="text-xs text-slate-500">{progress}%</span>
+        </header>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* Welcome */}
             {step === 'welcome' && (
-              <div className="space-y-4">
-                <p className="text-slate-300">
-                  Shivver needs a few configuration values to work:
-                </p>
-                <ul className="list-disc list-inside space-y-2 text-slate-400 text-sm ml-4">
-                  <li><strong className="text-slate-200">OpenAI API key</strong> — for intelligence</li>
-                  <li><strong className="text-slate-200">Database</strong> — PostgreSQL (local or Supabase)</li>
-                  <li><strong className="text-slate-200">Optional:</strong> ElevenLabs (voice), Exa (search), Google Drive (backup)</li>
-                </ul>
-                <div className="pt-4">
-                  <Button onClick={() => setStep('mode')} className="w-full">
-                    Let&apos;s Configure <ChevronRight className="h-4 w-4 ml-2" />
-                  </Button>
+              <div className="flex flex-col items-start justify-center h-full space-y-6">
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight">Welcome to Shivver</h1>
+                  <p className="mt-2 text-slate-400">Your personal AI assistant. Let&apos;s get you set up in under 2 minutes.</p>
                 </div>
+
+                <div className="space-y-3 text-sm text-slate-300">
+                  <p>You&apos;ll need:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-4">
+                    <li><strong className="text-slate-200">OpenAI API key</strong> — for intelligence</li>
+                    <li><strong className="text-slate-200">PostgreSQL</strong> — local or Supabase</li>
+                    <li><strong className="text-slate-400">Optional:</strong> ElevenLabs (voice), Exa (search), Google Drive (backup)</li>
+                  </ul>
+                </div>
+
+                <Button onClick={() => setStep('mode')} className="w-full mt-4">
+                  Get Started <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
               </div>
             )}
 
-            {/* Step: Mode Selection */}
+            {/* Mode Selection */}
             {step === 'mode' && (
-              <div className="space-y-4">
-                <p className="text-slate-400 text-sm">
-                  Choose where Shivver stores its data. You can switch later in Settings.
-                </p>
-                <div className="grid grid-cols-1 gap-3">
+              <div className="space-y-4 py-2">
+                <div>
+                  <h2 className="text-2xl font-bold">Choose Deployment Mode</h2>
+                  <p className="text-slate-400 text-sm mt-1">Where should Shivver store its data? You can switch later in Settings.</p>
+                </div>
+
+                <div className="grid gap-3">
                   <Card
                     className={`cursor-pointer transition-all ${config.mode === 'local' ? 'ring-2 ring-accent bg-accent/5' : 'hover:bg-surface'}`}
                     onClick={() => { updateConfig('mode', 'local'); setStep('api-keys'); }}
                   >
                     <CardContent className="pt-4">
                       <div className="flex items-center gap-3">
-                        <HardDrive className="h-6 w-6 text-blue-400" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/20">
+                          <HardDrive className="h-5 w-5 text-blue-400" />
+                        </div>
                         <div>
                           <div className="font-semibold">Local Mode</div>
                           <div className="text-xs text-slate-400">Filesystem + PostgreSQL on your machine</div>
@@ -263,10 +262,12 @@ export default function OnboardingPage() {
                   >
                     <CardContent className="pt-4">
                       <div className="flex items-center gap-3">
-                        <Cloud className="h-6 w-6 text-purple-400" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-500/20">
+                          <Cloud className="h-5 w-5 text-purple-400" />
+                        </div>
                         <div>
-                          <div className="font-semibold">Cloud Mode (Supabase)</div>
-                          <div className="text-xs text-slate-400">Hosted Postgres + Storage on Supabase</div>
+                          <div className="font-semibold">Cloud Mode</div>
+                          <div className="text-xs text-slate-400">Supabase-hosted Postgres + Storage</div>
                         </div>
                         {config.mode === 'cloud' && <Check className="h-5 w-5 ml-auto text-accent" />}
                       </div>
@@ -276,9 +277,14 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step: API Keys */}
+            {/* API Keys */}
             {step === 'api-keys' && (
-              <div className="space-y-4">
+              <div className="space-y-4 py-2">
+                <div>
+                  <h2 className="text-2xl font-bold">API Keys</h2>
+                  <p className="text-slate-400 text-sm mt-1">Enter your service credentials.</p>
+                </div>
+
                 <div className="space-y-3">
                   <div>
                     <label className="text-sm font-medium mb-1 block">OpenAI API Key *</label>
@@ -326,44 +332,58 @@ export default function OnboardingPage() {
                       </div>
                     </>
                   )}
-
-                  {config.mode === 'local' && (
-                    <div>
-                      <label className="text-sm font-medium mb-1 block">PostgreSQL Database URL (optional if already set)</label>
-                      <Input
-                        type="password"
-                        placeholder="postgresql://user:pass@localhost:5432/shivver"
-                        value={config.databaseUrl}
-                        onChange={e => updateConfig('databaseUrl', e.target.value)}
-                      />
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        Can be empty if DATABASE_URL already exists on server.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <Button variant="secondary" onClick={() => setStep('mode')} className="flex-1">
+                  <Button variant="secondary" onClick={() => setStep('mode')} disabled={running} className="flex-1">
                     Back
                   </Button>
-                  <Button
-                    onClick={saveEnvAndContinue}
-                    disabled={!config.openaiKey || running}
-                    className="flex-1"
-                  >
-                    {running ? <Spinner size="sm" /> : 'Save & Continue'}
+                  <Button onClick={saveEnvAndContinue} disabled={!config.openaiKey || running} className="flex-1">
+                    {running ? <Spinner size="sm" /> : 'Continue'}
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* Step: Database / Migrate */}
+            {/* Database URL (only for local mode) */}
+            {step === 'database' && config.mode === 'local' && (
+              <div className="space-y-4 py-2">
+                <div>
+                  <h2 className="text-2xl font-bold">Database Connection</h2>
+                  <p className="text-slate-400 text-sm mt-1">Provide your PostgreSQL connection string.</p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-1 block">DATABASE_URL</label>
+                  <Input
+                    type="password"
+                    placeholder="postgresql://user:pass@localhost:5432/shivver"
+                    value={config.databaseUrl}
+                    onChange={e => updateConfig('databaseUrl', e.target.value)}
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Can be left empty if already set on the server. Otherwise, create a local Postgres DB.
+                  </p>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button variant="secondary" onClick={() => setStep('api-keys')} className="flex-1">Back</Button>
+                  <Button onClick={() => setStep('migrate')} disabled={running} className="flex-1">
+                    Continue
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Migrate */}
             {step === 'migrate' && (
-              <div className="space-y-4">
-                <p className="text-slate-400 text-sm">
-                  Click the button to create database tables and seed initial data. This only needs to be done once.
-                </p>
+              <div className="space-y-4 py-2">
+                <div>
+                  <h2 className="text-2xl font-bold">Initialize Database</h2>
+                  <p className="text-slate-400 text-sm mt-1">
+                    Click to create tables and seed initial data. This runs <code className="px-1 py-0.5 rounded bg-surface text-xs">npx drizzle-kit push</code>.
+                  </p>
+                </div>
 
                 <div className="bg-surface rounded-lg p-4 font-mono text-xs text-slate-300 space-y-1 max-h-48 overflow-y-auto">
                   {log.length === 0 && <span className="opacity-50">Waiting to start...</span>}
@@ -375,8 +395,8 @@ export default function OnboardingPage() {
                   {running && <Spinner size="sm" className="inline ml-2" />}
                 </div>
 
-                <div className="flex gap-3">
-                  <Button variant="secondary" onClick={() => setStep('api-keys')} disabled={running} className="flex-1">
+                <div className="flex gap-3 pt-2">
+                  <Button variant="secondary" onClick={() => setStep(config.mode === 'cloud' ? 'api-keys' : 'database')} disabled={running} className="flex-1">
                     Back
                   </Button>
                   <Button onClick={runMigrations} disabled={running} className="flex-1">
@@ -386,21 +406,19 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step: Done */}
+            {/* Done */}
             {step === 'done' && (
-              <div className="space-y-6 text-center">
-                <div className="flex items-center justify-center">
-                  <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center">
-                    <Check className="h-8 w-8 text-success" />
-                  </div>
+              <div className="flex flex-col items-center justify-center h-full space-y-6 text-center">
+                <div className="w-20 h-20 rounded-full bg-success/20 flex items-center justify-center">
+                  <Check className="h-10 w-10 text-success" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold mb-2">You&apos;re all set!</h3>
-                  <p className="text-slate-400 text-sm">
+                  <h2 className="text-2xl font-bold">You&apos;re all set!</h2>
+                  <p className="text-slate-400 text-sm mt-2">
                     Shivver is configured and ready. Start chatting, or explore the 3D brain first.
                   </p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3 w-full">
                   <Button variant="secondary" as="a" href="/brain" className="flex-1">
                     Explore Brain
                   </Button>
@@ -410,15 +428,8 @@ export default function OnboardingPage() {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Skip link */}
-        {step !== 'done' && step !== 'welcome' && (
-          <p className="text-center text-sm text-slate-400">
-            Already configured? <button onClick={() => router.push('/')} className="text-accent hover:underline">Skip to app</button>
-          </p>
-        )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
