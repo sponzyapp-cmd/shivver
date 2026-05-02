@@ -1,58 +1,68 @@
-// AGI Autonomous Run Endpoint — triggered by cron or manual
-// POST /api/agi/run — scans all sensors, generates events, processes them, returns alerts
-
 import { NextRequest, NextResponse } from 'next/server';
+import cron from 'node-cron';
 import { collectEvents } from '@/lib/agi/event-collector';
 import { processEvent } from '@/lib/agi/orchestrator';
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { mode = 'full', targetAgent } = body;
+// Local AGI scheduler (for computer/terminal mode)
+let cronJob: any = null;
 
-    // 1. Collect events from all sensors
-    const events = await collectEvents();
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const action = url.searchParams.get('action');
 
-    // 2. Process each event through agent orchestra
-    const allResults = [];
-    for (const event of events) {
-      const results = await processEvent(event);
-      allResults.push(...results);
+  if (action === 'start') {
+    if (cronJob) {
+      return NextResponse.json({ success: true, message: 'AGI already running', status: 'active' });
     }
 
-    // 3. Flatten Telegram messages
-    const telegramAlerts: string[] = [];
-    for (const result of allResults) {
-      result.telegramMessages.forEach(tm => telegramAlerts.push(tm.text));
-    }
-
-    // 4. If a specific agent was targeted, run it standalone with latest data
-    if (targetAgent) {
-      // Re-import AGENTS inline to avoid circular
-      const { AGENTS } = await import('@/lib/agi/agents');
-      const agent = AGENTS.find(a => a.id === targetAgent);
-      if (agent) {
-        const syntheticEvent = {
-          type: 'manual_trigger',
-          payload: { triggeredBy: 'user', timestamp: new Date().toISOString() },
-          timestamp: new Date(),
-          source: 'api',
-          severity: 'high',
-        };
-        const result = await processEvent(syntheticEvent);
-        result.forEach(r => r.telegramMessages.forEach(m => telegramAlerts.push(m.text)));
+    // Run every hour
+    cronJob = cron.schedule('0 * * * *', async () => {
+      console.log('[AGI LOCAL] Running hourly scan...');
+      try {
+        const events = await collectEvents();
+        for (const event of events) {
+          await processEvent(event);
+        }
+        console.log(`[AGI LOCAL] Processed ${events.length} events`);
+      } catch (e) {
+        console.error('[AGI LOCAL] Error:', e);
       }
-    }
-
-    return NextResponse.json({
-      success: true,
-      eventsProcessed: events.length,
-      agentsRun: allResults.length,
-      alerts: telegramAlerts,
-      timestamp: new Date().toISOString(),
     });
-  } catch (err: any) {
-    console.error('AGI run error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+
+    // Also run immediately
+    setTimeout(async () => {
+      const events = await collectEvents();
+      for (const event of events) {
+        await processEvent(event);
+      }
+    }, 2000);
+
+    return NextResponse.json({ success: true, message: 'AGI scheduler started (hourly)', status: 'active' });
   }
+
+  if (action === 'stop') {
+    if (cronJob) {
+      cronJob.stop();
+      cronJob = null;
+    }
+    return NextResponse.json({ success: true, message: 'AGI scheduler stopped', status: 'inactive' });
+  }
+
+  if (action === 'status') {
+    return NextResponse.json({ 
+      success: true, 
+      status: cronJob ? 'active' : 'inactive',
+      schedule: '0 * * * * (hourly)'
+    });
+  }
+
+  // Default: run once
+  const events = await collectEvents();
+  let results = 0;
+  for (const event of events) {
+    await processEvent(event);
+    results++;
+  }
+
+  return NextResponse.json({ success: true, processed: results });
 }

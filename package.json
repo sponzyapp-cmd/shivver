@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "monitor": "node scripts/monitor.js",
+    "agi:start": "curl -X GET \"http://localhost:3000/api/agi/run?action=start\"",
+    "agi:stop": "curl -X GET \"http://localhost:3000/api/agi/run?action=stop\"",
+    "agi:once": "node scripts/agi-once.js",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio"
@@ -36,6 +39,7 @@
     "html2canvas": "^1.4.1",
     "lucide-react": "^1.11.0",
     "nanoid": "^5.1.9",
+    "node-cron": "^3.0.3",
     "next": "16.2.4",
     "openai": "^6.34.0",
     "pg": "^8.20.0",

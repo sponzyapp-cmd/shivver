@@ -1,0 +1,16 @@
+name: AGI Hourly Poll
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  agi-poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger AGI Endpoint
+        run: |
+          curl -X GET "${{ secrets.SHIVVER_URL }}/api/cron/run?mode=agi" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"

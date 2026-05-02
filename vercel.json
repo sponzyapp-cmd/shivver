@@ -21,6 +21,12 @@
     },
     "app/api/tts/route.ts": {
       "maxDuration": 30
+    },
+    "app/api/cron/run/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/agi/run/route.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [
