@@ -5,7 +5,7 @@ import { callLLM, type LLMMessage } from '@/lib/llm-provider';
 import { db, agent_executions } from '@/lib/db';
 import { AGENTS, EVENT_ROUTING, ALERT_LEVELS, type AgentProfile } from './agents';
 import { agiCore, type AGIIntention } from './divine-core';
-import { sparseAttention, type AttentionToken } from './divine-sparse-attention';
+import { sparseAttention, type AttentionToken } from './sparse-attention';
 import { handleLeadFinder, handleSendEmail, handleCreateCampaign } from '@/lib/biz-tools';
 import { nanoid } from 'nanoid';
 
@@ -32,17 +32,13 @@ export type AgentExecutionResult = {
 export async function processEvent(event: AGIEvent): Promise<AgentExecutionResult[]> {
   const results: AgentExecutionResult[] = [];
 
-  // Sparse Attention: index and select relevant tokens
   const query = `${event.type}: ${JSON.stringify(event.payload).slice(0, 100)}`;
   const { selectedTokens, complexity } = await sparseAttention.reason(query);
 
-  // Store new event as token
   sparseAttention.addToken(query, event.severity === 'critical' ? 1 : 0.5);
 
-  // Create intention
   const intention = agiCore.createIntention(query, event.severity || 'normal');
 
-  // Get candidate agents
   let candidateAgents: string[] = [];
 
   if (event.type === 'user_command') {
@@ -57,7 +53,6 @@ export async function processEvent(event: AGIEvent): Promise<AgentExecutionResul
     candidateAgents = EVENT_ROUTING[event.type] || ['knowledge_engine'];
   }
 
-  // Execute agents with sparse attention
   for (const agentId of candidateAgents) {
     const agent = getAgent(agentId);
     if (!agent) continue;

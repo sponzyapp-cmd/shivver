@@ -3,16 +3,11 @@
 
 import {EventEmitter} from 'node:events';
 
-// ============================================================================
-// Sparse Attention Core
-// ============================================================================
-
 export interface AttentionToken {
   id: string;
   content: string;
   importance: number;
   timestamp: number;
-  selectedBy?: string[];
 }
 
 export interface LightningIndexerResult {
@@ -36,7 +31,6 @@ export class SparseAttention extends EventEmitter {
     this.emit('index:initialized', {tokens: this.tokens.size});
   }
 
-  // Lightning indexer - compute importance scores
   lightningIndexScore(query: string): Map<string, LightningIndexerResult> {
     const results = new Map<string, LightningIndexerResult>();
     const queryWords = new Set(query.toLowerCase().split(/\s+/));
@@ -46,7 +40,6 @@ export class SparseAttention extends EventEmitter {
         .filter(w => queryWords.has(w)).length;
       
       const recencyScore = 1 / (1 + (Date.now() - token.timestamp) / 3600000);
-      
       const score = (wordOverlap * 0.5) + (recencyScore * 0.3) + (token.importance * 0.2);
       
       results.set(id, {
@@ -60,7 +53,6 @@ export class SparseAttention extends EventEmitter {
     return results;
   }
 
-  // Fine-grained token selection - top-k
   selectTopKTokens(query: string): AttentionToken[] {
     const scores = this.lightningIndexScore(query);
     
@@ -73,7 +65,6 @@ export class SparseAttention extends EventEmitter {
       .filter((t): t is AttentionToken => t !== undefined);
   }
 
-  // O(L²) → O(Lk) complexity reduction
   getComplexityReduction(tokenCount: number): { original: string; sparse: string; speedup: number } {
     const original = tokenCount ** 2;
     const sparse = tokenCount * this.k;
@@ -109,7 +100,6 @@ export class SparseAttention extends EventEmitter {
     return token;
   }
 
-  // Sparse attention reasoning
   async reason(query: string): Promise<{
     selectedTokens: AttentionToken[];
     complexity: { original: string; sparse: string; speedup: string };
@@ -124,5 +114,4 @@ export class SparseAttention extends EventEmitter {
   }
 }
 
-// Singleton Sparse Attention
 export const sparseAttention = new SparseAttention();
