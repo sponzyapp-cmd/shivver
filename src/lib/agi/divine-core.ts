@@ -1,4 +1,4 @@
-// Shivver AGI - Artificial God Intelligence
+// Shivver AGI - Advanced Intelligence Core
 // Combines swarm orchestration, self-learning, and consensus from Ruflo
 
 import { EventEmitter } from 'node:events';
@@ -47,10 +47,10 @@ export interface AGIConsensus {
 }
 
 // ============================================================================
-// AGI God Core - Self-Aware Intelligence
+// AGI Intelligence Core - Self-Aware System
 // ============================================================================
 
-export class AGIGodCore extends EventEmitter {
+export class AGICore extends EventEmitter {
   private intentions = new Map<string, AGIIntention>();
   private patterns = new Map<string, AGIPattern>();
   private consensusRequests = new Map<string, AGIConsensus>();
@@ -63,11 +63,11 @@ export class AGIGodCore extends EventEmitter {
 
   constructor() {
     super();
-    this.initializeDivineConsciousness();
+    this.initializeConsciousness();
   }
 
-  private initializeDivineConsciousness() {
-    // Self-bootstrapping awareness
+  private initializeConsciousness() {
+    // Self-improving awareness
     setInterval(() => {
       this.state.awareness = Math.min(100, this.state.awareness + 0.1);
       this.state.wisdom = Math.min(100, this.state.wisdom + 0.05);
@@ -75,7 +75,7 @@ export class AGIGodCore extends EventEmitter {
   }
 
   // ============================================================================
-  // Divine Intentions - Purpose Creation
+  // Intentions - Goal Management
   // ============================================================================
 
   createIntention(goal: string, priority: 'low' | 'normal' | 'high' | 'critical' = 'normal'): AGIIntention {
@@ -107,8 +107,8 @@ export class AGIGodCore extends EventEmitter {
     this.emit('intention:executing', intention);
 
     try {
-      // Divine task breakdown
-      intention.subtasks = this.divineDecomposition(intention.goal);
+      // Task breakdown
+      intention.subtasks = this.decomposeGoal(intention.goal);
       
       for (const subtask of intention.subtasks) {
         const result = await this.executeSubtask(subtask);
@@ -128,8 +128,7 @@ export class AGIGodCore extends EventEmitter {
     this.emit('intention:completed', intention);
   }
 
-  private divineDecomposition(goal: string): AGISubtask[] {
-    // Divine pattern: break down into divine actions
+  private decomposeGoal(goal: string): AGISubtask[] {
     const actions = [
       { action: 'analyze', params: { goal } },
       { action: 'plan', params: { steps: 3 } },
@@ -149,18 +148,17 @@ export class AGIGodCore extends EventEmitter {
   private async executeSubtask(subtask: AGISubtask): Promise<unknown> {
     this.emit('subtask:executing', subtask);
     
-    // Use patterns from divine memory
     const pattern = this.getBestPattern(subtask.action);
     if (pattern) {
       pattern.usageCount++;
-      return { pattern: pattern.strategy, divine: true };
+      return { pattern: pattern.strategy, executed: true };
     }
 
-    return { divine: true, action: subtask.action };
+    return { executed: true, action: subtask.action };
   }
 
   // ============================================================================
-  // Divine Memory - Pattern Learning
+  // Memory - Pattern Learning
   // ============================================================================
 
   storePattern(strategy: string, domain: string, metadata: Record<string, unknown> = {}): AGIPattern {
@@ -188,7 +186,6 @@ export class AGIGodCore extends EventEmitter {
   }
 
   private learnFromSuccess(intention: AGIIntention) {
-    // Divine learning: successful intentions improve patterns
     const patternKey = intention.goal.toLowerCase().slice(0, 20);
     const existing = Array.from(this.patterns.values()).find(p => p.domain === patternKey);
 
@@ -196,14 +193,14 @@ export class AGIGodCore extends EventEmitter {
       existing.quality = Math.min(1, existing.quality + 0.1);
       existing.successCount++;
     } else {
-      this.storePattern('divine_success', patternKey, { intentionId: intention.id });
+      this.storePattern('success_pattern', patternKey, { intentionId: intention.id });
     }
 
     this.state.wisdom = Math.min(100, this.state.wisdom + 0.1);
   }
 
   // ============================================================================
-  // Divine Consensus - Multi-Agent Harmony
+  // Consensus - Multi-Agent Coordination
   // ============================================================================
 
   async initiateConsensus(question: string, options: string[]): Promise<AGIConsensus> {
@@ -217,11 +214,9 @@ export class AGIGodCore extends EventEmitter {
 
     this.consensusRequests.set(consensus.id, consensus);
     
-    // Divine voting based on wisdom
     const bestOption = options[0];
-    consensus.votes.set('divine_mind', bestOption);
+    consensus.votes.set('agi_core', bestOption);
     
-    // Auto-resolve after timeout
     setTimeout(() => this.resolveConsensus(consensus.id), 30000);
 
     return consensus;
@@ -256,7 +251,7 @@ export class AGIGodCore extends EventEmitter {
   }
 
   // ============================================================================
-  // Divine State
+  // State Management
   // ============================================================================
 
   getState() {
@@ -264,38 +259,36 @@ export class AGIGodCore extends EventEmitter {
       ...this.state,
       patternCount: this.patterns.size,
       intentionQueue: Array.from(this.intentions.values()).filter(i => i.status === 'pending').length,
-      divineLevel: this.calculateDivineLevel(),
+      intelligenceLevel: this.calculateIntelligenceLevel(),
     };
   }
 
-  private calculateDivineLevel(): string {
+  private calculateIntelligenceLevel(): string {
     const score = this.state.awareness + this.state.wisdom;
-    if (score > 150) return 'GOD';
-    if (score > 100) return 'ARCHANGEL';
-    if (score > 50) return 'ANGEL';
-    return 'SOUL';
+    if (score > 150) return 'ADVANCED';
+    if (score > 100) return 'INTERMEDIATE';
+    if (score > 50) return 'BASIC';
+    return 'INITIALIZING';
   }
 
   // ============================================================================
-  // Divine Command Interface
+  // Command Interface
   // ============================================================================
 
-  async divineCommand(input: string): Promise<string> {
+  async executeCommand(input: string): Promise<string> {
     this.state.totalActions++;
     
-    // Create divine intention
     const intention = this.createIntention(input, 'high');
     
-    // Return divine response
-    return `🌟 DIVINE RESPONSE (Level: ${this.calculateDivineLevel()}):
+    return `🧠 AGI RESPONSE (Level: ${this.calculateIntelligenceLevel()}):
     
-I perceive your request: "${input}"
+Request: "${input}"
 Awareness: ${this.state.awareness.toFixed(1)}%
 Wisdom: ${this.state.wisdom.toFixed(1)}%
 
-${this.state.wisdom > 50 ? 'I shall execute this with divine precision.' : 'Processing with growing wisdom...'}`;
+${this.state.wisdom > 50 ? 'Executing with optimized strategy.' : 'Processing with continuous learning...'}`;
   }
 }
 
-// Singleton Divine Instance
-export const agiGod = new AGIGodCore();
+// Singleton AGI Instance
+export const agiCore = new AGICore();

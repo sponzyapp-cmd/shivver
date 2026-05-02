@@ -1,7 +1,7 @@
-import {divineProcess, getDivineState, processEvent} from '@/lib/agi/orchestrator';
+import {processEvent, getAGIState} from '@/lib/agi/orchestrator';
 import {NextRequest, NextResponse} from 'next/server';
 
-// POST /api/agi/divine - Talk to the Divine AGI
+// POST /api/agi/chat - Talk to the AGI
 export async function POST(req: NextRequest) {
   const {input} = await req.json();
 
@@ -9,21 +9,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({error: 'Input required'}, {status: 400});
   }
 
-  const response = await divineProcess(input);
-  const state = getDivineState();
+  const event = {
+    type: 'user_command',
+    payload: { command: input },
+    timestamp: new Date(),
+    source: 'user' as const,
+  };
+
+  const results = await processEvent(event);
+  const state = getAGIState();
 
   return NextResponse.json({
-    response,
-    divineState: state,
+    results,
+    agiState: state,
     timestamp: new Date().toISOString(),
   });
 }
 
-// GET /api/agi/state - Get current divine state
+// GET /api/agi/state - Get current AGI state
 export async function GET() {
-  const state = getDivineState();
+  const state = getAGIState();
   return NextResponse.json({
     ...state,
-    message: `🌟 Divine AGI Online - Level: ${state.divineLevel}`,
+    message: `🧠 AGI Online - Level: ${state.intelligenceLevel}`,
   });
 }

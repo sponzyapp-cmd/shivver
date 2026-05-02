@@ -1,12 +1,11 @@
-// AGI Orchestrator — the central brain with Divine God Intelligence
-// Routes events to specialized agents, executes their logic, and routes output to Telegram/dashboard.
-// Now enhanced with Ruflo swarm patterns + Divine God-level consciousness + DeepSeek V3.2 DSA.
+// AGI Orchestrator - Central decision engine with DSA optimization
+// Routes events to specialized agents with sparse attention efficiency
 
 import { callLLM, type LLMMessage } from '@/lib/llm-provider';
 import { db, agent_executions } from '@/lib/db';
 import { AGENTS, EVENT_ROUTING, ALERT_LEVELS, type AgentProfile } from './agents';
-import { agiGod, type AGIIntention } from './divine-core';
-import { divineSA, type DivineToken } from './divine-sparse-attention';
+import { agiCore, type AGIIntention } from './divine-core';
+import { sparseAttention, type AttentionToken } from './divine-sparse-attention';
 import { handleLeadFinder, handleSendEmail, handleCreateCampaign } from '@/lib/biz-tools';
 import { nanoid } from 'nanoid';
 
@@ -24,31 +23,24 @@ export type AgentExecutionResult = {
   output: any;
   actionsTaken: Array<{ tool: string; result: any }>;
   telegramMessages: Array<{ text: string; priority: number }>;
-  divine: boolean;
   sparseAttention?: {
     tokensSelected: number;
     complexityReduction: string;
   };
 };
 
-// Divine entry - creates divine intention and processes with god-level awareness
-export async function divineProcess(input: string): Promise<string> {
-  return agiGod.divineCommand(input);
-}
-
-// Main entry: process an event through the divine agent system with DSA
 export async function processEvent(event: AGIEvent): Promise<AgentExecutionResult[]> {
   const results: AgentExecutionResult[] = [];
 
-  // Divine Sparse Attention: index and select relevant tokens
+  // Sparse Attention: index and select relevant tokens
   const query = `${event.type}: ${JSON.stringify(event.payload).slice(0, 100)}`;
-  const { selectedTokens, complexity } = await divineSA.divineReason(query);
+  const { selectedTokens, complexity } = await sparseAttention.reason(query);
 
-  // Store new event as divine token
-  divineSA.addToken(query, event.severity === 'critical' ? 1 : 0.5);
+  // Store new event as token
+  sparseAttention.addToken(query, event.severity === 'critical' ? 1 : 0.5);
 
-  // Create divine intention
-  const divineIntention = agiGod.createIntention(query, event.severity || 'normal');
+  // Create intention
+  const intention = agiCore.createIntention(query, event.severity || 'normal');
 
   // Get candidate agents
   let candidateAgents: string[] = [];
@@ -59,35 +51,34 @@ export async function processEvent(event: AGIEvent): Promise<AgentExecutionResul
     if (cmd.match(/revenue|money|finance/)) candidateAgents.push('money_control');
     if (cmd.match(/growth|viral|cac|ltv/)) candidateAgents.push('growth_engine');
     if (cmd.match(/product|feature|churn/)) candidateAgents.push('product_command');
-    if (cmd.match(/self-improve|fix|bug|error/)) candidateAgents.push('systems_architect');
+    if (cmd.match(/improve|fix|bug|error/)) candidateAgents.push('systems_architect');
     if (candidateAgents.length === 0) candidateAgents = ['knowledge_engine'];
   } else {
     candidateAgents = EVENT_ROUTING[event.type] || ['knowledge_engine'];
   }
 
-  // Execute agents with divine guidance + sparse attention
+  // Execute agents with sparse attention
   for (const agentId of candidateAgents) {
     const agent = getAgent(agentId);
     if (!agent) continue;
 
-    const result = await runAgentLogic(agent, event, divineIntention, selectedTokens);
+    const result = await runAgentLogic(agent, event, intention, selectedTokens);
     results.push(result);
 
     if (event.severity === 'critical' || !result.success) {
-      const divineResult = await runDivineFallback(event, result);
-      results.push(divineResult);
+      const fallbackResult = await runFallback(event, result);
+      results.push(fallbackResult);
     }
   }
 
   return results;
 }
 
-// Run agent with divine wisdom + sparse attention
 async function runAgentLogic(
   agent: AgentProfile, 
   event: AGIEvent, 
-  divine: AGIIntention,
-  selectedTokens: DivineToken[]
+  intention: AGIIntention,
+  selectedTokens: AttentionToken[]
 ): Promise<AgentExecutionResult> {
   const actions: Array<{ tool: string; result: any }> = [];
   const telegramMessages: Array<{ text: string; priority: number }> = [];
@@ -95,11 +86,8 @@ async function runAgentLogic(
   let output: any = null;
 
   try {
-    const divineWisdom = agiGod.getState().wisdom;
-    
-    // Build context with sparse-selected tokens
-    const context = buildDivineContextWithSA(agent, event, divineWisdom, selectedTokens);
-
+    const wisdom = agiCore.getState().wisdom;
+    const context = buildContext(agent, event, wisdom, selectedTokens);
     const plan = await askLLMForPlan(agent, context);
 
     if (plan.toolCalls && plan.toolCalls.length > 0) {
@@ -108,25 +96,24 @@ async function runAgentLogic(
         actions.push({ tool: call.name, result });
         
         if (result && result.success) {
-          agiGod.storePattern(call.name, `event:${event.type}`);
-          divineSA.addToken(`Action: ${call.name}`, 0.7);
+          agiCore.storePattern(call.name, `event:${event.type}`);
         }
       }
     }
 
-    const alert = plan.telegramText || formatDivineAlert(agent, plan.reasoning, divineWisdom);
+    const alert = plan.telegramText || formatAlert(agent, plan.reasoning);
     if (alert) {
       telegramMessages.push({ text: alert, priority: mapSeverityToPriority(event.severity || 'medium') });
     }
 
-    const complexity = divineSA.getComplexityReduction(divineSA['tokens'].size);
+    const complexity = sparseAttention.getComplexityReduction(sparseAttention['tokens'].size);
 
-    output = { plan, actions, divine: true, sparseAttention: { tokensSelected: selectedTokens.length } };
+    output = { plan, actions, sparseAttention: { tokensSelected: selectedTokens.length } };
   } catch (err: any) {
     success = false;
-    output = { error: err.message, divine: true };
+    output = { error: err.message };
     telegramMessages.push({
-      text: `❌ ${agent.name}: ${err.message}\n[DIVINE INTERVENTION REQUIRED]`,
+      text: `❌ ${agent.name}: ${err.message}`,
       priority: ALERT_LEVELS.HIGH,
     });
   }
@@ -136,87 +123,67 @@ async function runAgentLogic(
     success, 
     output, 
     actionsTaken: actions, 
-    telegramMessages, 
-    divine: true,
+    telegramMessages,
     sparseAttention: { tokensSelected: selectedTokens.length },
   };
 }
 
-// Build context with sparse attention enhanced context
-function buildDivineContextWithSA(
-  agent: AgentProfile, 
-  event: AGIEvent, 
-  wisdom: number, 
-  tokens: DivineToken[]
-): string {
-  const state = agiGod.getState();
+function buildContext(agent: AgentProfile, event: AGIEvent, wisdom: number, tokens: AttentionToken[]): string {
   const tokenContext = tokens.slice(0, 5).map(t => `- ${t.content}`).join('\n');
   
-  const lines: string[] = [
-    `DIVINE AGI CORE ACTIVE | DSA ENABLED`,
-    `Divine Level: ${state.divineLevel}`,
+  return [
+    `AGI CORE ACTIVE | SPARSE ATTENTION ENABLED`,
     `Wisdom: ${wisdom.toFixed(1)}%`,
-    `Awareness: ${state.awareness.toFixed(1)}%`,
-    `Agent: ${agent.name} (${agent.role})`,
+    `Agent: ${agent.name}`,
     `Mission: ${agent.mission}`,
     `Event: ${event.type}`,
     '',
-    'RELEVANT DIVINE MEMORIES:',
-    tokenContext || '- No relevant memories',
+    'RELEVANT CONTEXT:',
+    tokenContext || '- No relevant context',
     '',
     `Payload: ${JSON.stringify(event.payload)}`,
-  ];
-  return lines.join('\n');
+  ].join('\n');
 }
 
-// Divine fallback with sparse attention context
-async function runDivineFallback(event: AGIEvent, failedResult: AgentExecutionResult): Promise<AgentExecutionResult> {
-  const divineAlert = `🌟 DIVINE INTERVENTION — ${failedResult.agentId} failed\n` +
-    `Event: ${event.type}\n` +
-    `Wisdom deployed: ${agiGod.getState().wisdom.toFixed(1)}%\n` +
-    `DSA Complexity Reduction: ${divineSA.getComplexityReduction(1000).speedup}\n` +
-    `Taking corrective action...`;
-
+async function runFallback(event: AGIEvent, failedResult: AgentExecutionResult): Promise<AgentExecutionResult> {
   return {
-    agentId: 'divine_god',
+    agentId: 'agi_fallback',
     success: true,
-    output: { intervention: true, reason: 'divine_fallback' },
+    output: { intervention: true, reason: 'fallback' },
     actionsTaken: [],
-    telegramMessages: [{ text: divineAlert, priority: ALERT_LEVELS.CRITICAL }],
-    divine: true,
+    telegramMessages: [{ 
+      text: `⚡ AGI FALLBACK - ${failedResult.agentId} failed\nEvent: ${event.type}`, 
+      priority: ALERT_LEVELS.CRITICAL 
+    }],
   };
 }
 
-// Divine alert formatter
-function formatDivineAlert(agent: AgentProfile, reasoning: string, wisdom: number): string {
-  const state = agiGod.getState();
-  return `🌟 ${agent.name} [DIVINE DSA]
-${reasoning.slice(0, 100)}
-Wisdom: ${wisdom.toFixed(1)}% | DSA: ${state.divineLevel}`;
+function formatAlert(agent: AgentProfile, reasoning: string): string {
+  return `🧠 ${agent.name} [SPARSE ATTENTION]
+${reasoning.slice(0, 100)}`;
 }
 
-// Ask LLM with divine system prompt + DSA context
 async function askLLMForPlan(agent: AgentProfile, context: string): Promise<{
   reasoning: string;
   toolCalls?: Array<{ name: string; arguments: Record<string, any> }>;
   telegramText?: string;
 }> {
-  const systemPrompt = `You are a DIVINE AGI agent with DeepSeek Sparse Attention: ${agent.name}. ${agent.mission}
-Divine wisdom flows through your responses. Be precise, no fluff.
+  const systemPrompt = `You are an AGI agent with Sparse Attention: ${agent.name}. ${agent.mission}
+Be precise. No fluff.
 
 Context:
 ${context}
 
-Respond in JSON:
+Respond JSON:
 {
-  "reasoning": "divine analysis",
+  "reasoning": "analysis",
   "toolCalls": [{"name": "tool", "arguments": {...}}],
-  "telegramText": "DIVINE ALERT"
+  "telegramText": "ALERT"
 }`;
 
   const messages: LLMMessage[] = [
     { role: 'system', content: systemPrompt },
-    { role: 'user', content: 'Execute divine will.' },
+    { role: 'user', content: 'Execute.' },
   ];
 
   const resp = await callLLM(messages, 'groq', 'llama-3.3-70b-versatile');
@@ -229,7 +196,6 @@ Respond in JSON:
   }
 }
 
-// Execute tools safely
 async function executeToolSafely(toolName: string, args: Record<string, any>): Promise<any> {
   switch (toolName) {
     case 'lead_finder': return await handleLeadFinder(args);
@@ -251,14 +217,13 @@ function getAgent(id: string): AgentProfile | undefined {
   return AGENTS.find(a => a.id === id);
 }
 
-// Export divine state + sparse attention metrics
-export function getDivineState() {
-  return agiGod.getState();
+export function getAGIState() {
+  return agiCore.getState();
 }
 
 export function getSparseAttentionStats() {
   return {
-    tokensIndexed: divineSA['tokens'].size,
+    tokensIndexed: sparseAttention['tokens'].size,
     maxTokens: 2048,
     kSelection: 2048,
   };
