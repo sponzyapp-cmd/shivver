@@ -32,7 +32,7 @@ interface ProviderConfig {
   baseUrlEnv?: string;
   models: string[];
   defaultModel: string;
-  baseURL?: string; // static override if needed
+  baseURL?: string;
 }
 
 const PROVIDERS: ProviderConfig[] = [
@@ -77,7 +77,7 @@ const PROVIDERS: ProviderConfig[] = [
   {
     id: 'ollama',
     name: 'Ollama (Local)',
-    keyEnv: '', // no key
+    keyEnv: '',
     keysEnv: '',
     modelEnv: 'OLLAMA_MODEL',
     baseUrlEnv: 'OLLAMA_BASE_URL',
@@ -97,18 +97,17 @@ function getEnvArray(envVar: string): string[] {
 function getProviderConfig(providerId: ProviderId): ProviderConfig {
   const found = PROVIDERS.find(p => p.id === providerId);
   if (!found) {
-    console.error('[llm-provider] Unknown provider:', providerId, 'type:', typeof providerId, 'value:', providerId);
     throw new Error(`Unknown LLM provider: ${providerId}. Available: ${PROVIDERS.map(p => p.id).join(', ')}`);
   }
   return found;
 }
 
 function getAllProvidersInOrder(): ProviderId[] {
+  // Priority order: groq first (cheap/free), then others
   const orderEnv = process.env.LLM_PROVIDER_ORDER;
   const ordered: ProviderId[] = orderEnv
     ? (orderEnv.split(',').map(p => p.trim().toLowerCase() as ProviderId).filter(Boolean) as ProviderId[])
-    : ['openai', 'groq', 'anthropic', 'gemini', 'ollama'];
-  // Ensure all known providers present
+    : ['groq', 'openai', 'anthropic', 'gemini', 'ollama'];
   for (const p of PROVIDERS) {
     if (!ordered.includes(p.id)) ordered.push(p.id);
   }
@@ -116,9 +115,10 @@ function getAllProvidersInOrder(): ProviderId[] {
 }
 
 function getDefaultProvider(): ProviderId {
+  // Priority: Vercel env first, then in-app env, fallback to groq
   const def = process.env.DEFAULT_LLM_PROVIDER?.toLowerCase();
   if (def && PROVIDERS.find(p => p.id === def)) return def as ProviderId;
-  return 'openai';
+  return 'groq'; // Default to groq (free/cheap)
 }
 
 // ── Smart Failover Dispatcher ─────────────────────────────────────────────────
@@ -132,7 +132,6 @@ export async function callLLM(
   const primaryProvider = preferredProvider || defaultProv;
   const providerOrder = getAllProvidersInOrder();
 
-  // Reorder: try primary first, then others in configured order
   const tryOrder: ProviderId[] = [primaryProvider];
   for (const p of providerOrder) {
     if (p !== primaryProvider && !tryOrder.includes(p)) tryOrder.push(p);
@@ -143,22 +142,18 @@ export async function callLLM(
   for (const providerId of tryOrder) {
     const cfg = getProviderConfig(providerId);
 
-    // Build key list
     const keys: string[] = [];
     const primaryKey = process.env[cfg.keyEnv];
     if (primaryKey) keys.push(primaryKey);
     const extraKeys = getEnvArray(cfg.keysEnv);
     keys.push(...extraKeys);
 
-    // If no key and provider requires one, skip (except ollama)
     if (keys.length === 0 && providerId !== 'ollama') {
       continue;
     }
 
-    // Determine model
     const model = preferredModel || process.env[cfg.modelEnv] || cfg.defaultModel;
 
-    // Try each key
     for (const key of keys) {
       try {
         let result: LLMResponse;
@@ -179,11 +174,9 @@ export async function callLLM(
 
         return result;
       } catch (err: any) {
-        // Rate limit (429) → try next key
         if (err.status === 429 || err.code === 'rate_limit' || err.message?.toLowerCase().includes('rate limit')) {
           continue;
         }
-        // Other errors (auth, not found) — break keys loop, try next provider
         lastError = err;
         break;
       }
@@ -259,7 +252,6 @@ async function callAnthropic(
   messages: LLMMessage[],
   apiKey: string
 ): Promise<LLMResponse> {
-  // Placeholder — would use @anthropic-ai/sdk
   throw new Error('Anthropic not yet implemented — coming soon');
 }
 
@@ -268,7 +260,6 @@ async function callGemini(
   messages: LLMMessage[],
   apiKey: string
 ): Promise<LLMResponse> {
-  // Placeholder — would use @google/generative-ai
   throw new Error('Gemini not yet implemented — coming soon');
 }
 
@@ -291,7 +282,7 @@ async function callOllama(
     content: data.message?.content || '',
     model,
     provider: 'ollama',
-    tokensUsed: { prompt: 0, completion: 0, total: 0 }, // Ollama doesn't always return counts
+    tokensUsed: { prompt: 0, completion: 0, total: 0 },
     cost: 0,
   };
 }
@@ -299,7 +290,6 @@ async function callOllama(
 // ── Cost Estimation ───────────────────────────────────────────────────────────
 
 function estimateOpenAICost(model: string, promptTokens: number, completionTokens: number): number {
-  // Prices per 1K tokens (approx, check OpenAI pricing)
   const prices: Record<string, { prompt: number; completion: number }> = {
     'gpt-4o-mini': { prompt: 0.00015, completion: 0.0006 },
     'gpt-4o': { prompt: 0.005, completion: 0.015 },
