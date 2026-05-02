@@ -1,5 +1,4 @@
-[
-  {
+
     "event_message": "[TICKET-DEBUG] raw was already an object, using directly\n",
     "event_type": "Log",
     "execution_id": "42dd4331-96b3-43ca-aa4a-85764c1e2c60",
