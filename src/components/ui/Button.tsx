@@ -12,26 +12,26 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyles = `
       inline-flex items-center justify-center gap-2
       font-medium transition-all duration-200 ease-out
-      focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary
       disabled:opacity-50 disabled:cursor-not-allowed
       active:scale-[0.98] active:transition-transform
     `;
 
     const variants = {
       primary: `
-        bg-accent text-white shadow-md hover:bg-accent-hover
+        bg-primary text-primary-foreground shadow-md hover:bg-primary/90
         active:shadow-none
       `,
       secondary: `
-        bg-surface-secondary text-text border border-border
-        hover:bg-border/50 active:bg-border/70
+        bg-secondary text-secondary-foreground border border-border
+        hover:bg-muted active:bg-muted
       `,
       ghost: `
-        bg-transparent text-text-secondary hover:text-text hover:bg-surface-secondary
+        bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted
         active:bg-border
       `,
       danger: `
-        bg-error text-white shadow-sm hover:opacity-90 active:opacity-80
+        bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 active:bg-destructive/80
       `,
     };
 

@@ -10,7 +10,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Shivver — Personal AI",
-  description: "Your personal AI assistant, inspired by JARVIS and The Machine",
+  description: "Your personal AI assistant with Sponzy styling",
   icons: {
     icon: "/favicon.ico",
   },
@@ -23,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full`}>
-      <body className="h-full antialiased bg-base text-text">
+      <body className="h-full antialiased bg-background text-foreground">
         <NavBar />
         {children}
       </body>

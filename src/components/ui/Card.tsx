@@ -8,10 +8,10 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, variant = 'default', ...props }, ref) => {
     const variants = {
-      default: 'bg-surface border border-border shadow-sm',
-      elevated: 'bg-surface shadow-lg border-0',
+      default: 'bg-card border border-border shadow-sm',
+      elevated: 'bg-card shadow-lg border-0',
       outlined: 'bg-transparent border-2 border-border',
-      glass: 'glass',
+      glass: 'bg-background/60 dark:bg-background/40 backdrop-blur-xl border border-border/50',
     };
 
     return (
@@ -29,7 +29,6 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
 );
 Card.displayName = 'Card';
 
-// ── Subcomponents ────────────────────────────────────────────────────────────
 const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
@@ -45,7 +44,7 @@ const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTML
   ({ className, ...props }, ref) => (
     <h3
       ref={ref}
-      className={cn('text-lg font-semibold text-text', className)}
+      className={cn('text-lg font-semibold text-foreground', className)}
       {...props}
     />
   )
@@ -56,7 +55,7 @@ const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('text-text-secondary', className)}
+      className={cn('text-muted-foreground', className)}
       {...props}
     />
   )
