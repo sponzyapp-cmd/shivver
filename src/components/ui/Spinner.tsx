@@ -15,8 +15,8 @@ const Spinner = React.forwardRef<SVGSVGElement, SpinnerProps>(
     };
 
     const colors = {
-      primary: 'text-accent',
-      secondary: 'text-text-tertiary',
+      primary: 'text-primary',
+      secondary: 'text-muted-foreground',
     };
 
     return (

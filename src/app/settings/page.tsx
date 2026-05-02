@@ -13,7 +13,7 @@ interface EnvVar {
   key: string;
   value: string;
   isSecret: boolean;
-  provider?: string; // e.g., 'openai', 'groq'
+  provider?: string;
 }
 
 const LLM_PROVIDERS = [
@@ -59,7 +59,6 @@ export default function SettingsPage() {
       }));
       setEnvVars(vars);
 
-      // Build provider keys map
       const p: Record<string, { key: string; keys: string; model: string }> = {};
       for (const prov of LLM_PROVIDERS) {
         p[prov.id] = {
@@ -68,7 +67,6 @@ export default function SettingsPage() {
           model: data.env[prov.modelEnv] || '',
         };
       }
-      // Also get provider order
       p['_order'] = { key: data.env['LLM_PROVIDER_ORDER'] || '', keys: '', model: '' };
       p['_default'] = { key: data.env['DEFAULT_LLM_PROVIDER'] || '', keys: '', model: '' };
       setProviderKeys(p);
@@ -89,7 +87,6 @@ export default function SettingsPage() {
     try {
       const body: Record<string, string> = {};
 
-      // Provider config
       for (const prov of LLM_PROVIDERS) {
         const p = providerKeys[prov.id];
         if (p) {
@@ -98,7 +95,6 @@ export default function SettingsPage() {
           if (p.model) body[prov.modelEnv] = p.model;
         }
       }
-      // Order + default
       if (providerKeys['_order']?.key) body['LLM_PROVIDER_ORDER'] = providerKeys['_order'].key;
       if (providerKeys['_default']?.key) body['DEFAULT_LLM_PROVIDER'] = providerKeys['_default'].key;
 
@@ -157,8 +153,8 @@ export default function SettingsPage() {
   if (!config) return null;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <h1 className="text-3xl font-bold mb-6">Settings</h1>
+    <div className="max-w-4xl mx-auto space-y-6 p-6">
+      <h1 className="text-3xl font-bold mb-6 text-foreground">Settings</h1>
 
       {message && (
         <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
@@ -175,8 +171,8 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-slate-400 text-sm">
-            Choose where Shivver stores its data. Local mode uses filesystem + PostgreSQL (can be local).
+          <p className="text-muted-foreground text-sm">
+            Choose where Shivver stores its data. Local mode uses filesystem + PostgreSQL.
             Cloud mode uses Supabase.
           </p>
 
@@ -213,18 +209,17 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <p className="text-slate-400 text-sm">
+          <p className="text-muted-foreground text-sm">
             Choose which LLM provider powers Shivver. Add multiple keys for failover when rate limits hit.
           </p>
 
-          {/* Default provider + order */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium mb-1 block">Default Provider</label>
               <select
                 value={providerKeys['_default']?.key || 'openai'}
                 onChange={e => saveProviderConfig('_default', 'key', e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm"
+                className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm"
               >
                 {LLM_PROVIDERS.map(p => (
                   <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
@@ -238,20 +233,19 @@ export default function SettingsPage() {
                 onChange={e => saveProviderConfig('_order', 'key', e.target.value)}
                 placeholder="openai,groq,anthropic"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Shivver tries providers in order when one is rate-limited.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Shivver tries providers in order when one is rate-limited.</p>
             </div>
           </div>
 
-          {/* Per-provider config */}
           <div className="space-y-4">
             {LLM_PROVIDERS.map(prov => {
               const p = providerKeys[prov.id] || { key: '', keys: '', model: '' };
               return (
-                <div key={prov.id} className="border border-border/50 rounded-lg p-4 bg-surface/30">
+                <div key={prov.id} className="border border-border rounded-lg p-4 bg-card/50">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-lg">{prov.icon}</span>
-                    <h3 className="font-semibold">{prov.name}</h3>
-                    {p.key && <Badge variant="success" size="sm">Configured</Badge>}
+                    <h3 className="font-semibold text-foreground">{prov.name}</h3>
+                    {p.key && <Badge variant="secondary" size="sm">Configured</Badge>}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -269,7 +263,7 @@ export default function SettingsPage() {
                       <select
                         value={p.model}
                         onChange={e => saveProviderConfig(prov.id, 'model', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm"
+                        className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm"
                       >
                         <option value="">Auto (recommended)</option>
                         {prov.models.map(m => (
@@ -290,20 +284,9 @@ export default function SettingsPage() {
                         onChange={e => saveProviderConfig(prov.id, 'keys', e.target.value)}
                         placeholder={`Additional ${prov.name} keys (optional)`}
                       />
-                      <p className="text-[11px] text-slate-400 mt-1">
+                      <p className="text-[11px] text-muted-foreground mt-1">
                         Add extra keys to auto-rotate when daily limits are reached.
                       </p>
-                    </div>
-                  )}
-
-                  {prov.baseUrlEnv && (
-                    <div className="mt-3">
-                      <label className="text-sm font-medium mb-1 block">Base URL</label>
-                      <Input
-                        value={p.key /* reuse field for base URL */}
-                        onChange={e => saveProviderConfig(prov.id, 'key', e.target.value)}
-                        placeholder="http://localhost:11434"
-                      />
                     </div>
                   )}
                 </div>
@@ -317,38 +300,6 @@ export default function SettingsPage() {
               Save AI Provider Configuration
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Google Drive */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Cloud className="h-5 w-5" />
-            Google Drive Backup
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-slate-400 text-sm mb-4">
-            Backup your brain graph and settings to Google Drive.
-          </p>
-          <Button onClick={() => { }}>
-            <Link2 className="h-4 w-4 mr-2" />
-            Connect Google Drive
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Stats Link */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Analytics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Button as="a" href="/stats" variant="secondary">
-            <Zap className="h-4 w-4 mr-2" />
-            View Usage Statistics
-          </Button>
         </CardContent>
       </Card>
     </div>

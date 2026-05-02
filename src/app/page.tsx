@@ -111,7 +111,6 @@ export default function Home() {
           if (ttsData.audioUrl) {
             setAudioUrl(ttsData.audioUrl);
             setVoiceState('speaking');
-            // Play automatically
             setTimeout(() => {
               const audio = new Audio(ttsData.audioUrl);
               audio.play().catch(() => {});
@@ -207,15 +206,15 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] max-w-3xl mx-auto bg-base">
+    <div className="flex flex-col h-[100dvh] max-w-3xl mx-auto bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 glass border-b border-border/50">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-card/80 backdrop-blur-md border-b border-border">
         <div className="flex items-center gap-3">
           {/* AI Sphere — sound-reactive avatar */}
           <AISphere state={voiceMode ? voiceState : 'idle'} size={48} />
           <div>
-            <h1 className="text-base font-semibold text-text">Shivver</h1>
-            <p className="text-[11px] text-text-tertiary flex items-center gap-1">
+            <h1 className="text-base font-semibold text-foreground">Shivver</h1>
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1">
               {voiceMode ? (
                 voiceState === 'listening' ? 'Listening...' :
                 voiceState === 'processing' ? 'Thinking...' :
@@ -225,7 +224,7 @@ export default function Home() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="accent" size="sm">BETA</Badge>
+          <Badge variant="default" size="sm">BETA</Badge>
         </div>
       </header>
 
@@ -279,11 +278,11 @@ export default function Home() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="bg-surface/80 backdrop-blur-xl border-t border-border p-4 flex flex-col items-center gap-4"
+            className="bg-card/80 backdrop-blur-xl border-t border-border p-4 flex flex-col items-center gap-4"
           >
             <div className="flex flex-col items-center gap-2">
               <VoiceWaveform active={voiceState === 'listening'} size="lg" />
-              <p className="text-sm text-text-secondary">
+              <p className="text-sm text-muted-foreground">
                 {voiceState === 'listening' ? 'Speak now...' :
                  voiceState === 'processing' ? 'Transcribing...' :
                  voiceState === 'speaking' ? 'Playing response...' : 'Ready'}
