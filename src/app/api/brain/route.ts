@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { brain_nodes, brain_connections, brain_clusters, user_actions } from '@/lib/db/schema';
+import { db, brain_nodes, brain_connections, brain_clusters, user_actions } from '@/lib/db';
 import { sql, desc } from 'drizzle-orm';
 
 // GET /api/brain/graph — fetch 3D graph for current user

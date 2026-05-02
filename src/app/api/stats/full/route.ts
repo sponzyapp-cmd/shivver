@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { sessions, messages, tool_executions, agent_executions } from '@/lib/db/schema';
+import { db, sessions, messages, tool_executions, agent_executions } from '@/lib/db';
 import { sql, desc, count } from 'drizzle-orm';
 
 // GET /api/stats/full — aggregated stats for dashboard

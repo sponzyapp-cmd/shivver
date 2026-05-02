@@ -95,7 +95,12 @@ function getEnvArray(envVar: string): string[] {
 }
 
 function getProviderConfig(providerId: ProviderId): ProviderConfig {
-  return PROVIDERS.find(p => p.id === providerId)!;
+  const found = PROVIDERS.find(p => p.id === providerId);
+  if (!found) {
+    console.error('[llm-provider] Unknown provider:', providerId, 'type:', typeof providerId, 'value:', providerId);
+    throw new Error(`Unknown LLM provider: ${providerId}. Available: ${PROVIDERS.map(p => p.id).join(', ')}`);
+  }
+  return found;
 }
 
 function getAllProvidersInOrder(): ProviderId[] {
@@ -133,7 +138,7 @@ export async function callLLM(
     if (p !== primaryProvider && !tryOrder.includes(p)) tryOrder.push(p);
   }
 
-  const lastError: Error | null = null;
+  let lastError: Error | null = null;
 
   for (const providerId of tryOrder) {
     const cfg = getProviderConfig(providerId);

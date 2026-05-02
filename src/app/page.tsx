@@ -78,7 +78,7 @@ export default function Home() {
       if (!reader) throw new Error('No reader');
 
       const decoder = new TextDecoder();
-      let assistantMsg: Message = {
+      const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: '',

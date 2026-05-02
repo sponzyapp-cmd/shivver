@@ -1,11 +1,23 @@
-import { db } from '@/lib/db';
-import { agents, agent_executions, tools, tool_executions, messages, sessions } from '@/lib/db/schema';
+import { db, agents, agent_executions, tools, tool_executions, messages, sessions } from '@/lib/db';
 import { eq, sql, desc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { supabase } from '@/lib/supabase';
 import { executeComputerTool } from '@/lib/computer-tool-executor';
 import { planTask } from '@/lib/vision';
 import { callLLM, type LLMMessage } from '@/lib/llm-provider';
+// Business automation tool handlers
+import {
+  handleLeadFinder,
+  handleSendEmail,
+  handleCreateCampaign,
+  handleTrackMetrics,
+  handleContentGen,
+  handleReadFile,
+  handleGitDiff,
+  handleDeployVercel,
+  handleSelfImprove,
+  handleErrorMonitor,
+} from '@/lib/biz-tools';
 
 export type ToolCall = {
   name: string;
@@ -109,6 +121,47 @@ async function executeTool(
       case 'computer_plan': {
         // Convert to planTask call
         result = await planTask(args.task as string);
+        break;
+      }
+      // Business Automation Toolkit
+      case 'lead_finder': {
+        result = await handleLeadFinder(args as any);
+        break;
+      }
+      case 'send_email': {
+        result = await handleSendEmail(args as any);
+        break;
+      }
+      case 'create_campaign': {
+        result = await handleCreateCampaign(args as any);
+        break;
+      }
+      case 'track_metrics': {
+        result = await handleTrackMetrics(args as any);
+        break;
+      }
+      case 'generate_content': {
+        result = await handleContentGen(args as any);
+        break;
+      }
+      case 'read_file': {
+        result = await handleReadFile(args as any);
+        break;
+      }
+      case 'git_diff': {
+        result = await handleGitDiff(args as any);
+        break;
+      }
+      case 'deploy_vercel': {
+        result = await handleDeployVercel(args as any);
+        break;
+      }
+      case 'self_improve': {
+        result = await handleSelfImprove(args as any);
+        break;
+      }
+      case 'monitor_errors': {
+        result = await handleErrorMonitor(args as any);
         break;
       }
       default:

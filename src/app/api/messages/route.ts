@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { sessions, messages } from '@/lib/db/schema';
+import { db, sessions, messages } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 

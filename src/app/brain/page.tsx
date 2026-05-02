@@ -1,4 +1,4 @@
-import Brain3DVisualization from '@/components/brain/Brain3DVisualization';
+import Brain3DVisualization from '@/components/brain/Brain3DWrapper';
 import { Suspense } from 'react';
 
 export const metadata = {

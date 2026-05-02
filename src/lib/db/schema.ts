@@ -239,6 +239,63 @@ export const brain_clusters = pgTable('brain_clusters', {
   userIdIdx: index('brain_cluster_user_idx').on(table.userId),
 }));
 
+// ── BUSINESS AUTOMATION TABLES ─────────────────────────────────────────────
+
+export const leads = pgTable('leads', {
+  id: serial('id').primaryKey(),
+  userId: serial('user_id').notNull().references(() => users.id),
+  name: text('name').notNull(),
+  email: text('email'),
+  company: text('company'),
+  website: text('website'),
+  sourceChannel: text('source_channel'),
+  queryUsed: text('query_used'),
+  relevanceScore: serial('relevance_score').default(0),
+  painPoints: jsonb('pain_points').$type<string[]>().default([]),
+  status: text('status', { enum: ['new', 'contacted', 'responded', 'qualified', 'lost'] }).default('new'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('leads_user_idx').on(table.userId),
+  emailIdx: index('leads_email_idx').on(table.email),
+}));
+
+export const campaigns = pgTable('campaigns', {
+  id: serial('id').primaryKey(),
+  userId: serial('user_id').notNull().references(() => users.id),
+  name: text('name').notNull(),
+  objective: text('objective'),
+  targetIcp: text('target_icp'),
+  sequence: jsonb('sequence').$type<Array<{day: number; subject: string; template: string}> >().notNull(),
+  dailyLimit: serial('daily_limit').default(10),
+  status: text('status', { enum: ['draft', 'active', 'paused', 'completed'] }).default('draft'),
+  startedAt: timestamp('started_at'),
+  pausedAt: timestamp('paused_at'),
+  endedAt: timestamp('ended_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const email_logs = pgTable('email_logs', {
+  id: serial('id').primaryKey(),
+  leadId: serial('lead_id').references(() => leads.id),
+  campaignId: serial('campaign_id').references(() => campaigns.id),
+  toEmail: text('to_email').notNull(),
+  subject: text('subject').notNull(),
+  body: text('body').notNull(),
+  sentAt: timestamp('sent_at'),
+  status: text('status', { enum: ['queued', 'sent', 'delivered', 'opened', 'clicked', 'bounced', 'failed'] }).default('queued'),
+  error: text('error'),
+  opens: serial('opens').default(0),
+  clicks: serial('clicks').default(0),
+  metadata: jsonb('metadata').$type<Record<string, any>>().default({}),
+}, (table) => ({
+  leadIdx: index('email_lead_idx').on(table.leadId),
+  campaignIdx: index('email_campaign_idx').on(table.campaignId),
+  statusIdx: index('email_status_idx').on(table.status),
+}));
+
 // ── TYPE EXPORTS ────────────────────────────────────────────────────────────
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
@@ -256,3 +313,6 @@ export type UserBrain = typeof user_brains.$inferSelect;
 export type BrainNode = typeof brain_nodes.$inferSelect;
 export type BrainConnection = typeof brain_connections.$inferSelect;
 export type BrainCluster = typeof brain_clusters.$inferSelect;
+export type Lead = typeof leads.$inferSelect;
+export type Campaign = typeof campaigns.$inferSelect;
+export type EmailLog = typeof email_logs.$inferSelect;

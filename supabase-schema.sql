@@ -182,6 +182,9 @@ alter table public.knowledge enable row level security;
 alter table public.budget enable row level security;
 alter table public.projects enable row level security;
 alter table public.tasks enable row level security;
+alter table public.leads enable row level security;
+alter table public.campaigns enable row level security;
+alter table public.email_logs enable row level security;
 
 -- Simple policies (adjust as needed)
 create policy "Users can view own data" on public.users for select using (auth.uid() = id);
@@ -209,6 +212,22 @@ create policy "Users can view own tasks" on public.tasks for select using (
 );
 create policy "Users can manage own tasks" on public.tasks for all using (
   project_id in (select id from public.projects where user_id = auth.uid())
+);
+
+-- Business data policies
+create policy "Users can view own leads" on public.leads for select using (auth.uid() = user_id);
+create policy "Users can manage own leads" on public.leads for all using (auth.uid() = user_id);
+
+create policy "Users can view own campaigns" on public.campaigns for select using (auth.uid() = user_id);
+create policy "Users can manage own campaigns" on public.campaigns for all using (auth.uid() = user_id);
+
+create policy "Users can view own email logs" on public.email_logs for select using (
+  lead_id in (select id from public.leads where user_id = auth.uid())
+  or campaign_id in (select id from public.campaigns where user_id = auth.uid())
+);
+create policy "Users can insert own email logs" on public.email_logs for insert with check (
+  lead_id in (select id from public.leads where user_id = auth.uid())
+  or campaign_id in (select id from public.campaigns where user_id = auth.uid())
 );
 
 -- Seed default agents
@@ -249,7 +268,80 @@ insert into public.tools (name, description, type, definition, requires_approval
   ('image_gen', 'Generate images from text prompts', 'image_gen',
    '{"provider": "openai"}', false),
   ('api_call', 'Make authenticated API calls', 'api_call',
-   '{"auth": "bearer"}', true);
+   '{"auth": "bearer"}', true),
+
+  -- Business Automation Tools
+  ('lead_finder', 'Find potential leads via web search and extraction', 'custom',
+   '{"query": "string", "limit": "number", "channels": "string[]"}', false),
+  ('send_email', 'Send personalized email messages', 'custom',
+   '{"to": "string", "subject": "string", "body": "string", "fromName": "string", "fromEmail": "string"}', true),
+  ('create_campaign', 'Create multi-step email campaign', 'custom',
+   '{"name": "string", "objective": "string", "targetIcp": "string", "sequence": "array", "dailyLimit": "number"}', true),
+  ('track_metrics', 'Pull business analytics from various sources', 'custom',
+   '{"sources": "string[]", "period": "string"}', false),
+  ('generate_content', 'Generate marketing content (blog, social, email)', 'custom',
+   '{"type": "string", "topic": "string", "tone": "string", "length": "string"}', false),
+  ('read_file', 'Read a file from local filesystem', 'custom',
+   '{"path": "string"}', true),
+  ('git_diff', 'Show git diff for source changes', 'custom',
+   '{"repoPath": "string", "file": "string"}', false),
+  ('deploy_vercel', 'Trigger a Vercel deployment', 'custom',
+   '{"projectId": "string", "gitCommit": "string"}', true),
+  ('self_improve', 'Analyze code and propose patches', 'custom',
+   '{"targetFile": "string", "goal": "string"}', false),
+  ('monitor_errors', 'Check recent errors and alert', 'custom',
+   '{"hoursBack": "number"}', false);
+
+-- ── BUSINESS AUTOMATION TABLES ─────────────────────────────────────────────
+create table if not exists public.leads (
+  id bigserial primary key,
+  user_id bigint references public.users(id) on delete cascade not null,
+  name text not null,
+  email text,
+  company text,
+  website text,
+  source_channel text,
+  query_used text,
+  relevance_score integer default 0 not null,
+  pain_points jsonb default '[]'::jsonb,
+  status text not null check (status in ('new','contacted','responded','qualified','lost')) default 'new',
+  notes text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+create index if not exists leads_user_idx on public.leads(user_id);
+create index if not exists leads_email_idx on public.leads(email);
+
+create table if not exists public.campaigns (
+  id bigserial primary key,
+  user_id bigint references public.users(id) on delete cascade not null,
+  name text not null,
+  objective text,
+  target_icp text,
+  sequence jsonb not null,
+  daily_limit integer default 10 not null,
+  status text not null check (status in ('draft','active','paused','completed')) default 'draft',
+  started_at timestamp with time zone,
+  paused_at timestamp with time zone,
+  ended_at timestamp with time zone,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create table if not exists public.email_logs (
+  id bigserial primary key,
+  lead_id bigint references public.leads(id),
+  campaign_id bigint references public.campaigns(id),
+  to_email text not null,
+  subject text not null,
+  body text not null,
+  sent_at timestamp with time zone,
+  status text not null check (status in ('queued','sent','delivered','opened','clicked','bounced','failed')) default 'queued',
+  error text,
+  opens integer default 0 not null,
+  clicks integer default 0 not null,
+  metadata jsonb default '{}'::jsonb
+);
 
 -- ── BRAIN SEED DATA ────────────────────────────────────────────────────────
 -- Pre-populate demo user's brain with starter nodes/connections so
