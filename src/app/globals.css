@@ -44,18 +44,4 @@
     --input: 0 0% 22.7%;
     --ring: 210 100% 44.5%;
   }
-
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
-}
-
-@layer utilities {
-  .glass {
-    @apply bg-card/50 backdrop-blur-md shadow-soft-lg;
-  }
 }
