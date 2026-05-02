@@ -4,7 +4,7 @@
 import { callLLM, type LLMMessage } from '@/lib/llm-provider';
 import { db, agent_executions } from '@/lib/db';
 import { AGENTS, EVENT_ROUTING, ALERT_LEVELS, type AgentProfile } from './agents';
-import { agiCore, type AGIIntention } from './divine-core';
+import { agiCore, type AGIIntention } from './agi-core';
 import { sparseAttention, type AttentionToken } from './sparse-attention';
 import { handleLeadFinder, handleSendEmail, handleCreateCampaign } from '@/lib/biz-tools';
 import { nanoid } from 'nanoid';
