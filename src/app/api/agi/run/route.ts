@@ -4,7 +4,7 @@ import { collectEvents } from '@/lib/agi/event-collector';
 import { processEvent } from '@/lib/agi/orchestrator';
 
 // Local AGI scheduler (for computer/terminal mode)
-let cronJob: any = null;
+let cronJob: ReturnType<typeof cron.schedule> | null = null;
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
