@@ -1,14 +1,10 @@
 'use client';
 
 import {useState} from 'react';
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
-import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {Label} from '@/components/ui/label';
-import {Textarea} from '@/components/ui/textarea';
-import {useToast} from '@/hooks/use-toast';
-import {useAuth} from '@/context/auth-provider';
-import {ArrowLeft, Briefcase, DollarSign, Filter, Globe, Hash, List, Type} from 'lucide-react';
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/Card';
+import {Button} from '@/components/ui/Button';
+import {Input} from '@/components/ui/Input';
+import {ArrowLeft, Briefcase, DollarSign, Filter, Type} from 'lucide-react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 
@@ -19,32 +15,22 @@ export default function PostCampaignPage() {
   const [budget, setBudget] = useState('');
   const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(false);
-  const {session} = useAuth();
-  const {toast} = useToast();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!session?.access_token) return;
-
     setLoading(true);
     try {
-      // Simple POST to AGI endpoint - customize as needed
       const res = await fetch('/api/campaigns', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({title, description, brand_name: brandName, budget: Number(budget), category}),
       });
 
       if (!res.ok) throw new Error('Failed to create campaign');
-
-      toast({title: 'Campaign created!', description: 'Your campaign is now live.'});
       router.push('/brain');
-    } catch (err: any) {
-      toast({title: 'Error', description: err.message, variant: 'destructive'});
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -80,16 +66,21 @@ export default function PostCampaignPage() {
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Brand</Label>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Brand</p>
               <Input placeholder="Your brand name" value={brandName} onChange={(e) => setBrandName(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Campaign Title</Label>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Campaign Title</p>
               <Input placeholder="Campaign name" value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Description</Label>
-              <Textarea placeholder="Describe your campaign..." value={description} onChange={(e) => setDescription(e.target.value)} />
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Description</p>
+              <textarea
+                className="w-full min-h-[80px] rounded-xl border bg-background px-3 py-2 text-sm"
+                placeholder="Describe your campaign..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
             </div>
           </CardContent>
         </Card>

@@ -2,9 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Sponzy-inspired styling */
+/* Shivver + Sponzy-inspired styling */
 @layer base {
   :root {
+    /* Sponzy-style colors */
     --background: 0 0% 98%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
@@ -25,6 +26,14 @@
     --input: 0 0% 93.3%;
     --ring: 210 100% 44.5%;
     --radius: 1.5rem;
+    /* Shivver legacy vars */
+    --surface: 0 0% 100%;
+    --surface-secondary: 0 0% 96%;
+    --surface-elevated: 0 0% 98%;
+    --text: 240 10% 3.9%;
+    --text-secondary: 240 3.8% 46.1%;
+    --accent-hover: 210 100% 38%;
+    --error: 0 84.2% 60.2%;
   }
 
   .dark {
@@ -43,5 +52,12 @@
     --border: 0 0% 22.7%;
     --input: 0 0% 22.7%;
     --ring: 210 100% 44.5%;
+    --surface: 0 0% 18.4%;
+    --surface-secondary: 0 0% 22%;
+    --surface-elevated: 0 0% 15%;
+    --text: 0 0% 98%;
+    --text-secondary: 240 5% 64.9%;
+    --accent-hover: 210 100% 44.5%;
+    --error: 0 62.8% 30.6%;
   }
 }
